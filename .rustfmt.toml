@@ -1,0 +1,9 @@
+edition = "2018"
+
+max_width = 100
+
+group_imports = "StdExternalCrate"
+imports_granularity = "Module"
+
+wrap_comments = true
+comment_width = 100
