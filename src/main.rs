@@ -1,5 +1,8 @@
 use std::io::Write;
 
+mod datasets;
+pub use datasets::DataSet;
+
 /// Prints an error message about the input being malformed to stdout.
 fn print_error_message() {
     println!("Malformed input. Please check your input and try again.");
@@ -55,9 +58,17 @@ fn process_input(input: &str, out: &mut Vec<String>) -> bool {
                 true
             }
             _ => {
-                let tokens: Vec<&str> = input.split(" ").into_iter().map(|s| s).collect();
+                let tokens: Vec<&str> = val.split(" ").into_iter().map(|s| s).collect();
                 if tokens.is_empty() || tokens[0] != "FROM" {
                     print_error_message();
+                } else if tokens[0] == "FROM" && tokens.len() > 1 {
+                    let dataset = DataSet::new();
+                    match tokens[1] {
+                        "language.csv" => println!("{:#?}", dataset.languages),
+                        "city.csv" => println!("{:#?}", dataset.cities),
+                        "country.csv" => println!("{:#?}", dataset.countries),
+                        _ => print_error_message(),
+                    }
                 } else {
                     out.push(input.to_string());
                 }
@@ -120,6 +131,7 @@ fn test_process_input_correct() {
 fn main() {
     println!("Toy Query Engine v0.1");
     println!("Enter your query, or 'help' for more information or 'exit' to exit.");
+    let _datasets = DataSet::new();
     loop {
         print!(">");
         std::io::stdout().flush().expect("Error writing to stdout.");
