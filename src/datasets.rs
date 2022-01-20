@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::fmt::Display;
 
 use serde::Deserialize;
 
@@ -10,6 +11,19 @@ pub struct Country {
     pub Continent: String,
     pub CountryPop: i64,
     pub Capital: Option<i64>,
+}
+impl Display for Country {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let capital = if self.Capital.is_some() {
+            self.Capital.unwrap().to_string()
+        } else {
+            String::new()
+        };
+        f.write_fmt(format_args!(
+            "{},{},{},{},{}",
+            self.CountryCode, self.CountryName, self.Continent, self.CountryPop, capital,
+        ))
+    }
 }
 
 fn load_countries() -> Result<Vec<Country>, Box<dyn Error>> {
@@ -31,6 +45,15 @@ pub struct City {
     pub CityPop: i64,
 }
 
+impl Display for City {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "{},{},{},{}",
+            self.CityID, self.CityName, self.CountryCode, self.CityPop,
+        ))
+    }
+}
+
 fn load_cities() -> Result<Vec<City>, Box<dyn Error>> {
     let mut cities: Vec<City> = Vec::new();
     let mut csv_reader = csv::Reader::from_path("data/city.csv")?;
@@ -47,6 +70,13 @@ pub struct Language {
     pub CountryCode: String,
     pub Language: String,
 }
+
+impl Display for Language {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{},{}", self.CountryCode, self.Language,))
+    }
+}
+
 fn load_languages() -> Result<Vec<Language>, Box<dyn Error>> {
     let mut languages: Vec<Language> = Vec::new();
     let mut csv_reader = csv::Reader::from_path("data/language.csv")?;

@@ -64,9 +64,21 @@ fn process_input(input: &str, out: &mut Vec<String>) -> bool {
                 } else if tokens[0] == "FROM" && tokens.len() > 1 {
                     let dataset = DataSet::new();
                     match tokens[1] {
-                        "language.csv" => println!("{:#?}", dataset.languages),
-                        "city.csv" => println!("{:#?}", dataset.cities),
-                        "country.csv" => println!("{:#?}", dataset.countries),
+                        "language.csv" => {
+                            for language in dataset.languages {
+                                println!("{}", language);
+                            }
+                        }
+                        "city.csv" => {
+                            for city in dataset.cities {
+                                println!("{}", city);
+                            }
+                        }
+                        "country.csv" => {
+                            for country in dataset.countries {
+                                println!("{}", country);
+                            }
+                        }
                         _ => print_error_message(),
                     }
                 } else {
