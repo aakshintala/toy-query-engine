@@ -11,7 +11,7 @@ fn print_error_message() {
     println!("Malformed input. Please check your input and try again.");
 }
 
-/// The help message to print to stdout when the user uses the `help` command.
+/// The help message to print to stdout for the `help` command.
 const C_HELP_MESSAGE: &str =
     "Available Commands: \n
       FROM <dataset> - Loads the `dataset`. \n
@@ -64,7 +64,7 @@ fn main() {
                     Dataset::Country => data.print_countries(),
                     Dataset::Language => data.print_languages(),
                 },
-                Command::Error => print_error_message(),
+                Command::InputError => print_error_message(),
             }
         }
     }

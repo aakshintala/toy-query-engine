@@ -1,16 +1,25 @@
+// The datasets known to the toy-query-engine.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Dataset {
+    // city.csv
     City,
+    // country.csv
     Country,
+    // language.csv
     Language,
 }
 
+// Commands parsed from user input.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
+    // The user entered the `exit` command.
     Exit,
+    // The user entered the `help` command.
     Help,
+    // The user entered a FROM <dataset> operator.
     From(Dataset),
-    Error,
+    // The user's input is erroneous.
+    InputError,
 }
 
 /// Parses the command entered on the CLI into a vector of [`Command`]s.
@@ -28,20 +37,20 @@ pub fn parse_commands(input: &str) -> Vec<Command> {
             _ => {
                 let tokens: Vec<&str> = val.split(" ").into_iter().map(|s| s).collect();
                 if tokens.is_empty() || tokens[0] != "FROM" {
-                    vec![Command::Error]
+                    vec![Command::InputError]
                 } else if tokens[0] == "FROM" && tokens.len() > 1 {
                     match tokens[1] {
                         "language.csv" => vec![Command::From(Dataset::Language)],
                         "city.csv" => vec![Command::From(Dataset::City)],
                         "country.csv" => vec![Command::From(Dataset::Country)],
-                        _ => vec![Command::Error],
+                        _ => vec![Command::InputError],
                     }
                 } else {
-                    vec![Command::Error]
+                    vec![Command::InputError]
                 }
             }
         },
-        None => vec![Command::Error],
+        None => vec![Command::InputError],
     }
 }
 
@@ -50,7 +59,7 @@ pub fn parse_commands(input: &str) -> Vec<Command> {
 fn test_parse_commands_no_input() {
     let commands = parse_commands("\n");
     assert_eq!(commands.len(), 1);
-    assert_eq!(commands[0], Command::Error);
+    assert_eq!(commands[0], Command::InputError);
 }
 
 /// Test 'exit' command as input
@@ -66,7 +75,7 @@ fn test_parse_commands_exit() {
 fn test_parse_commands_malformed1() {
     let commands = parse_commands("FRM language.csv\n");
     assert_eq!(commands.len(), 1);
-    assert_eq!(commands[0], Command::Error);
+    assert_eq!(commands[0], Command::InputError);
 }
 
 /// Test malformed command as input
@@ -74,7 +83,7 @@ fn test_parse_commands_malformed1() {
 fn test_parse_commands_malformed2() {
     let commands = parse_commands("TAKE language.csv\n");
     assert_eq!(commands.len(), 1);
-    assert_eq!(commands[0], Command::Error);
+    assert_eq!(commands[0], Command::InputError);
 }
 
 /// Test malformed command as input
@@ -82,7 +91,7 @@ fn test_parse_commands_malformed2() {
 fn test_parse_commands_malformed3() {
     let commands = parse_commands("language.csv\n");
     assert_eq!(commands.len(), 1);
-    assert_eq!(commands[0], Command::Error);
+    assert_eq!(commands[0], Command::InputError);
 }
 
 /// Test 'help'command as input
