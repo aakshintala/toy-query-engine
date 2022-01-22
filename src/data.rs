@@ -143,7 +143,7 @@ fn load_languages() -> Result<Vec<Language>, Box<dyn Error>> {
 
 /// In-memory representation of all the loaded datasets.
 #[derive(Clone, Debug)]
-pub struct DataSet {
+pub struct Data {
     /// All the rows in the `country.csv` dataset.
     pub countries: Vec<Country>,
     /// All the rows in the `city.csv` dataset.
@@ -152,12 +152,37 @@ pub struct DataSet {
     pub languages: Vec<Language>,
 }
 
-impl DataSet {
+impl Data {
+    /// Creates a new in-memory representation of the country, city and language datasets.
     pub fn new() -> Self {
         Self {
             countries: load_countries().expect("Couldn't load Country dataset."),
             cities: load_cities().expect("Couldn't load City dataset."),
             languages: load_languages().expect("Couldn't load Country dataset."),
+        }
+    }
+
+    /// Prints the `countries` dataset to stdout.
+    pub fn print_countries(&self) {
+        println!("CountryCode, CountryName, Continent, CountryPop, Capital");
+        for country in &self.countries {
+            println!("{}", country);
+        }
+    }
+
+    /// Prints the `cities` dataset to stdout.
+    pub fn print_cities(&self) {
+        println!("CityID, CityName, CountryCode, CityPop");
+        for city in &self.cities {
+            println!("{}", city);
+        }
+    }
+
+    /// Prints the `languages` dataset to stdout.
+    pub fn print_languages(&self) {
+        println!("CountryCode, Language");
+        for language in &self.languages {
+            println!("{}", language);
         }
     }
 }

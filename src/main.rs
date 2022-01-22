@@ -1,7 +1,10 @@
 use std::io::Write;
 
-mod datasets;
-pub use datasets::DataSet;
+mod commands;
+mod data;
+
+pub use commands::*;
+pub use data::*;
 
 /// Prints an error message about the input being malformed to stdout.
 fn print_error_message() {
@@ -36,114 +39,10 @@ const C_HELP_MESSAGE: &str =
           <column-name> : [CountryCode,Language]\n
           <numeric-column-name> : []\n";
 
-/// Processes the input received on the command line and carries out the required action.
-///
-/// # Arguments
-/// `input` : the input string to be processed.
-/// `out` : A mutable reference to a [`Vec<String>`] where any produced output will be written.
-///
-/// # Returns
-/// A boolean flag to indicate whether the program should exit.
-/// false: The program should not exit.
-/// true: The user has requested that the program exit.
-fn process_input(input: &str, out: &mut Vec<String>) -> bool {
-    match input.strip_suffix("\n") {
-        Some(val) => match val {
-            "help" => {
-                out.push(String::from(C_HELP_MESSAGE));
-                false
-            }
-            "exit" => {
-                println!("Goodbye!");
-                true
-            }
-            _ => {
-                let tokens: Vec<&str> = val.split(" ").into_iter().map(|s| s).collect();
-                if tokens.is_empty() || tokens[0] != "FROM" {
-                    print_error_message();
-                } else if tokens[0] == "FROM" && tokens.len() > 1 {
-                    let dataset = DataSet::new();
-                    match tokens[1] {
-                        "language.csv" => {
-                            for language in dataset.languages {
-                                println!("{}", language);
-                            }
-                        }
-                        "city.csv" => {
-                            for city in dataset.cities {
-                                println!("{}", city);
-                            }
-                        }
-                        "country.csv" => {
-                            for country in dataset.countries {
-                                println!("{}", country);
-                            }
-                        }
-                        _ => print_error_message(),
-                    }
-                } else {
-                    out.push(input.to_string());
-                }
-                false
-            }
-        },
-        None => false,
-    }
-}
-
-/// Test for NULL input
-#[test]
-fn test_process_input_no_input() {
-    assert_eq!(process_input("\n", &mut vec![]), false);
-}
-
-/// Test 'exit' command as input
-#[test]
-fn test_process_input_exit() {
-    assert_eq!(process_input("exit\n", &mut vec![]), true);
-}
-
-/// Test malformed command as input
-#[test]
-fn test_process_input_malformed1() {
-    assert_eq!(process_input("FRM language.csv\n", &mut vec![]), false);
-}
-
-/// Test malformed command as input
-#[test]
-fn test_process_input_malformed2() {
-    assert_eq!(process_input("TAKE language.csv\n", &mut vec![]), false);
-}
-
-/// Test malformed command as input
-#[test]
-fn test_process_input_malformed3() {
-    assert_eq!(process_input("language.csv\n", &mut vec![]), false);
-}
-
-/// Test 'help'command as input
-#[test]
-fn test_process_input_help() {
-    let help_message: Vec<String> = vec![String::from(C_HELP_MESSAGE)];
-    let mut out: Vec<String> = Vec::new();
-    let should_exit = process_input("help\n", &mut out);
-    assert_eq!(should_exit, false);
-    assert_eq!(help_message, out);
-}
-
-/// Test a well-formed input.
-#[test]
-fn test_process_input_correct() {
-    let mut out: Vec<String> = Vec::new();
-    let should_exit = process_input("FROM language.csv\n", &mut out);
-    assert_eq!(should_exit, false);
-    assert_eq!(out, vec![String::from("FROM language.csv\n")]);
-}
-
 fn main() {
     println!("Toy Query Engine v0.1");
     println!("Enter your query, or 'help' for more information or 'exit' to exit.");
-    let _datasets = DataSet::new();
+    let data = Data::new();
     loop {
         print!(">");
         std::io::stdout().flush().expect("Error writing to stdout.");
@@ -152,13 +51,20 @@ fn main() {
             print_error_message();
             continue;
         }
-        let mut out: Vec<String> = Vec::new();
-        if let true = process_input(&input, &mut out) {
-            std::process::exit(0);
-        } else {
-            // Print whatever is in the output vector and continue;
-            for str in out {
-                println!("{}", str);
+        let commands = parse_commands(&input);
+        for command in commands {
+            match command {
+                Command::Exit => {
+                    println!("Goodbye!");
+                    std::process::exit(0);
+                }
+                Command::Help => println!("{}", C_HELP_MESSAGE),
+                Command::From(dataset) => match dataset {
+                    Dataset::City => data.print_cities(),
+                    Dataset::Country => data.print_countries(),
+                    Dataset::Language => data.print_languages(),
+                },
+                Command::Error => print_error_message(),
             }
         }
     }
