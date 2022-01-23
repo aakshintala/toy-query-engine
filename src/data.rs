@@ -27,6 +27,22 @@ pub struct Country {
     pub Capital: Option<i64>,
 }
 
+impl Country {
+    pub fn column_names() -> Vec<&'static str> {
+        vec![
+            "CountryCode",
+            "CountryName",
+            "Continent",
+            "CountryPop",
+            "Capital",
+        ]
+    }
+    #[allow(dead_code)]
+    pub fn numeric_columns() -> Vec<&'static str> {
+        vec!["CountryPop", "Capital"]
+    }
+}
+
 impl Display for Country {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let capital = if self.Capital.is_some() {
@@ -46,7 +62,7 @@ impl Display for Country {
 /// Returns
 /// A vector of all the rows in the dataset represented as a [`Country`], or
 /// an error propagated from the csv and serde deserialization code.
-fn load_countries() -> Result<Vec<Country>, Box<dyn Error>> {
+pub fn load_countries() -> Result<Vec<Country>, Box<dyn Error>> {
     let mut countries: Vec<Country> = Vec::new();
     let mut csv_reader = csv::Reader::from_path("data/country.csv")?;
     for record in csv_reader.deserialize() {
@@ -87,12 +103,23 @@ impl Display for City {
     }
 }
 
+impl City {
+    pub fn column_names() -> Vec<&'static str> {
+        vec!["CityID", "CityName", "CountryCode", "CityPop"]
+    }
+
+    #[allow(dead_code)]
+    pub fn numeric_columns() -> Vec<&'static str> {
+        vec!["CityID", "CityPop"]
+    }
+}
+
 /// Helper function to deserialize the `city.csv` dataset.
 ///
 /// Returns
 /// A vector of all the rows in the dataset represented as a [`City`], or
 /// an error propagated from the csv and serde deserialization code.
-fn load_cities() -> Result<Vec<City>, Box<dyn Error>> {
+pub fn load_cities() -> Result<Vec<City>, Box<dyn Error>> {
     let mut cities: Vec<City> = Vec::new();
     let mut csv_reader = csv::Reader::from_path("data/city.csv")?;
     for record in csv_reader.deserialize() {
@@ -126,12 +153,23 @@ impl Display for Language {
     }
 }
 
+impl Language {
+    pub fn column_names() -> Vec<&'static str> {
+        vec!["CountryCode", "Language"]
+    }
+
+    #[allow(dead_code)]
+    pub fn numeric_columns() -> Vec<&'static str> {
+        vec![]
+    }
+}
+
 /// Helper function to deserialize the `language.csv` dataset.
 ///
 /// Returns
 /// A vector of all the rows in the dataset represented as a [`Language`], or
 /// an error propagated from the csv and serde deserialization code.
-fn load_languages() -> Result<Vec<Language>, Box<dyn Error>> {
+pub fn load_languages() -> Result<Vec<Language>, Box<dyn Error>> {
     let mut languages: Vec<Language> = Vec::new();
     let mut csv_reader = csv::Reader::from_path("data/language.csv")?;
     for record in csv_reader.deserialize() {
@@ -141,48 +179,150 @@ fn load_languages() -> Result<Vec<Language>, Box<dyn Error>> {
     Ok(languages)
 }
 
-/// In-memory representation of all the loaded datasets.
 #[derive(Clone, Debug)]
-pub struct Data {
-    /// All the rows in the `country.csv` dataset.
-    pub countries: Vec<Country>,
-    /// All the rows in the `city.csv` dataset.
-    pub cities: Vec<City>,
-    /// All the rows in the `language.csv` dataset.
-    pub languages: Vec<Language>,
+pub enum RowFragment {
+    City(City),
+    Country(Country),
+    Language(Language),
 }
 
-impl Data {
-    /// Creates a new in-memory representation of the country, city and language datasets.
-    pub fn new() -> Self {
-        Self {
-            countries: load_countries().expect("Couldn't load Country dataset."),
-            cities: load_cities().expect("Couldn't load City dataset."),
-            languages: load_languages().expect("Couldn't load Country dataset."),
+impl RowFragment {
+    fn headers(&self, excluded: Vec<bool>) -> Vec<&str> {
+        match self {
+            RowFragment::City(_) => City::column_names(),
+            RowFragment::Country(_) => Country::column_names(),
+            RowFragment::Language(_) => Language::column_names(),
         }
+        .into_iter()
+        .enumerate()
+        .filter(|(index, _)| excluded[*index] == false)
+        .map(|(_, name)| name)
+        .collect()
     }
 
-    /// Prints the `countries` dataset to stdout.
-    pub fn print_countries(&self) {
-        println!("CountryCode, CountryName, Continent, CountryPop, Capital");
-        for country in &self.countries {
-            println!("{}", country);
+    fn to_string_vec(&self, excluded: Vec<bool>) -> Vec<String> {
+        match self {
+            RowFragment::City(data) => excluded
+                .into_iter()
+                .enumerate()
+                .filter(|(_, val)| *val == false)
+                .map(|(index, _)| match index {
+                    0 => data.CityID.to_string(),
+                    1 => data.CityName.clone(),
+                    2 => data.CountryCode.clone(),
+                    3 => data.CityPop.to_string(),
+                    _ => unreachable!(),
+                })
+                .collect(),
+            RowFragment::Country(data) => excluded
+                .into_iter()
+                .enumerate()
+                .filter(|(_, val)| *val == false)
+                .map(|(index, _)| match index {
+                    0 => data.CountryCode.clone(),
+                    1 => data.CountryName.clone(),
+                    2 => data.Continent.clone(),
+                    3 => data.CountryPop.to_string(),
+                    4 => {
+                        if data.Capital.is_some() {
+                            data.Capital.unwrap().to_string()
+                        } else {
+                            String::new()
+                        }
+                    }
+                    _ => unreachable!(),
+                })
+                .collect(),
+            RowFragment::Language(data) => excluded
+                .into_iter()
+                .enumerate()
+                .filter(|(_, val)| *val == false)
+                .map(|(index, _)| match index {
+                    0 => data.CountryCode.clone(),
+                    1 => data.Language.clone(),
+                    _ => unreachable!(),
+                })
+                .collect(),
         }
     }
+}
 
-    /// Prints the `cities` dataset to stdout.
-    pub fn print_cities(&self) {
-        println!("CityID, CityName, CountryCode, CityPop");
-        for city in &self.cities {
-            println!("{}", city);
+#[derive(Clone, Debug)]
+pub struct Row {
+    pub fragments: Vec<RowFragment>,
+}
+
+#[derive(Clone, Debug)]
+pub enum ExcludedColumns {
+    City([bool; 4]),
+    Country([bool; 5]),
+    Language([bool; 2]),
+}
+
+#[allow(dead_code)]
+impl ExcludedColumns {
+    pub fn get_num_included_columns(&self) -> usize {
+        match self {
+            ExcludedColumns::City(excluded) => excluded
+                .into_iter()
+                .filter(|is_excluded| **is_excluded == false)
+                .count(),
+            ExcludedColumns::Country(excluded) => excluded
+                .into_iter()
+                .filter(|is_excluded| **is_excluded == false)
+                .count(),
+            ExcludedColumns::Language(excluded) => excluded
+                .into_iter()
+                .filter(|is_excluded| **is_excluded == false)
+                .count(),
         }
     }
+}
 
-    /// Prints the `languages` dataset to stdout.
-    pub fn print_languages(&self) {
-        println!("CountryCode, Language");
-        for language in &self.languages {
-            println!("{}", language);
+impl Into<Vec<bool>> for ExcludedColumns {
+    fn into(self) -> Vec<bool> {
+        match self {
+            ExcludedColumns::City(array) => array.into(),
+            ExcludedColumns::Country(array) => array.into(),
+            ExcludedColumns::Language(array) => array.into(),
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Data {
+    pub rows: Vec<Row>,
+    pub excluded_columns: Vec<ExcludedColumns>,
+}
+
+impl Display for Data {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let column_headers: String = self.rows[0]
+            .fragments
+            .iter()
+            .enumerate()
+            .map(|(index, fragment)| fragment.headers(self.excluded_columns[index].clone().into()))
+            .flatten()
+            .collect::<Vec<&str>>()
+            .join(",");
+
+        f.write_fmt(format_args!("{}\n", column_headers))?;
+
+        for row in &self.rows {
+            let row_vals: String = row
+                .fragments
+                .iter()
+                .enumerate()
+                .map(|(index, fragment)| {
+                    fragment.to_string_vec(self.excluded_columns[index].clone().into())
+                })
+                .flatten()
+                .collect::<Vec<String>>()
+                .join(",");
+
+            f.write_fmt(format_args!("{}\n", row_vals))?;
+        }
+
+        Ok(())
     }
 }

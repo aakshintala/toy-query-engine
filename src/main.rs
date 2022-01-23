@@ -2,9 +2,10 @@ use std::io::Write;
 
 mod commands;
 mod data;
+mod operators;
 
-pub use commands::*;
-pub use data::*;
+use commands::*;
+use operators::*;
 
 /// Prints an error message about the input being malformed to stdout.
 fn print_error_message() {
@@ -42,7 +43,6 @@ const C_HELP_MESSAGE: &str =
 fn main() {
     println!("Toy Query Engine v0.1");
     println!("Enter your query, or 'help' for more information or 'exit' to exit.");
-    let data = Data::new();
     loop {
         print!(">");
         std::io::stdout().flush().expect("Error writing to stdout.");
@@ -51,21 +51,16 @@ fn main() {
             print_error_message();
             continue;
         }
-        let commands = parse_commands(&input);
-        for command in commands {
-            match command {
-                Command::Exit => {
-                    println!("Goodbye!");
-                    std::process::exit(0);
-                }
-                Command::Help => println!("{}", C_HELP_MESSAGE),
-                Command::From(dataset) => match dataset {
-                    Dataset::City => data.print_cities(),
-                    Dataset::Country => data.print_countries(),
-                    Dataset::Language => data.print_languages(),
-                },
-                Command::InputError => print_error_message(),
+        match parse_command(&input) {
+            Command::Exit => {
+                println!("Goodbye!");
+                std::process::exit(0);
             }
+            Command::Help => println!("{}", C_HELP_MESSAGE),
+            Command::Operator(operator) => {
+                println!("{}", process_operator(operator));
+            }
+            Command::InputError => print_error_message(),
         }
     }
 }
