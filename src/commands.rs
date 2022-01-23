@@ -24,6 +24,36 @@ pub enum Command {
     InputError,
 }
 
+fn process_tokens(tokens: &Vec<&str>) -> Command {
+    let mut token_iter = tokens.into_iter();
+    let mut command = Command::InputError;
+    while let Some(token) = token_iter.next() {
+        command = match *token {
+            "FROM" => match token_iter.next() {
+                Some(&"language.csv") => Command::Operator(Operator::From(Dataset::Language)),
+                Some(&"city.csv") => Command::Operator(Operator::From(Dataset::City)),
+                Some(&"country.csv") => Command::Operator(Operator::From(Dataset::Country)),
+                _ => Command::InputError,
+            },
+            "SELECT" => match token_iter.next() {
+                Some(column) => {
+                    if let Command::Operator(operator) = command {
+                        Command::Operator(Operator::Select {
+                            chain: Box::new(operator),
+                            column: column.to_string(),
+                        })
+                    } else {
+                        Command::InputError
+                    }
+                }
+                _ => Command::InputError,
+            },
+            _ => command,
+        };
+    }
+    command
+}
+
 /// Parses the command entered on the CLI into a [`Command`].
 ///
 /// # Arguments
@@ -40,15 +70,8 @@ pub fn parse_command(input: &str) -> Command {
                 let tokens: Vec<&str> = val.split(" ").into_iter().map(|s| s).collect();
                 if tokens.is_empty() || tokens[0] != "FROM" {
                     Command::InputError
-                } else if tokens[0] == "FROM" && tokens.len() > 1 {
-                    match tokens[1] {
-                        "language.csv" => Command::Operator(Operator::From(Dataset::Language)),
-                        "city.csv" => Command::Operator(Operator::From(Dataset::City)),
-                        "country.csv" => Command::Operator(Operator::From(Dataset::Country)),
-                        _ => Command::InputError,
-                    }
                 } else {
-                    Command::InputError
+                    process_tokens(&tokens)
                 }
             }
         },

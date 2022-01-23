@@ -57,9 +57,10 @@ fn main() {
                 std::process::exit(0);
             }
             Command::Help => println!("{}", C_HELP_MESSAGE),
-            Command::Operator(operator) => {
-                println!("{}", process_operator(operator));
-            }
+            Command::Operator(operator) => match process_operator(operator) {
+                Ok(out) => println!("{}", out),
+                Err(e) => println!("{}", e),
+            },
             Command::InputError => print_error_message(),
         }
     }

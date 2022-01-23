@@ -187,7 +187,7 @@ pub enum RowFragment {
 }
 
 impl RowFragment {
-    fn headers(&self, excluded: Vec<bool>) -> Vec<&str> {
+    pub fn headers(&self, excluded: Vec<bool>) -> Vec<&str> {
         match self {
             RowFragment::City(_) => City::column_names(),
             RowFragment::Country(_) => Country::column_names(),
