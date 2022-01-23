@@ -3,6 +3,8 @@ use std::fmt::Display;
 
 use serde::Deserialize;
 
+use crate::table::{Cell, Row};
+
 /// In-memory representation of each record in the `country.csv` dataset.
 /// This is represented as a struct so we can use the [`serde`] and [`csv`] crates to generate
 /// the deserialization code.
@@ -57,6 +59,20 @@ impl Display for Country {
     }
 }
 
+impl Into<Row> for Country {
+    fn into(self) -> Row {
+        Row {
+            cells: vec![
+                Cell::String(self.CountryCode),
+                Cell::String(self.CountryName),
+                Cell::String(self.Continent),
+                Cell::Int64(self.CountryPop),
+                Cell::OptInt64(self.Capital),
+            ],
+        }
+    }
+}
+
 /// Helper function to deserialize the `country.csv` dataset.
 ///
 /// Returns
@@ -85,7 +101,7 @@ pub fn load_countries() -> Result<Vec<Country>, Box<dyn Error>> {
 #[allow(non_snake_case)]
 pub struct City {
     /// 1 in the example above.
-    pub CityID: i32,
+    pub CityID: i64,
     /// "Kabul" in the example above.
     pub CityName: String,
     /// "AFG" in the example above.
@@ -100,6 +116,19 @@ impl Display for City {
             "{},{},{},{}",
             self.CityID, self.CityName, self.CountryCode, self.CityPop,
         ))
+    }
+}
+
+impl Into<Row> for City {
+    fn into(self) -> Row {
+        Row {
+            cells: vec![
+                Cell::Int64(self.CityID),
+                Cell::String(self.CityName),
+                Cell::String(self.CountryCode),
+                Cell::Int64(self.CityPop),
+            ],
+        }
     }
 }
 
@@ -164,6 +193,14 @@ impl Language {
     }
 }
 
+impl Into<Row> for Language {
+    fn into(self) -> Row {
+        Row {
+            cells: vec![Cell::String(self.CountryCode), Cell::String(self.Language)],
+        }
+    }
+}
+
 /// Helper function to deserialize the `language.csv` dataset.
 ///
 /// Returns
@@ -177,152 +214,4 @@ pub fn load_languages() -> Result<Vec<Language>, Box<dyn Error>> {
         languages.push(language);
     }
     Ok(languages)
-}
-
-#[derive(Clone, Debug)]
-pub enum RowFragment {
-    City(City),
-    Country(Country),
-    Language(Language),
-}
-
-impl RowFragment {
-    pub fn headers(&self, excluded: Vec<bool>) -> Vec<&str> {
-        match self {
-            RowFragment::City(_) => City::column_names(),
-            RowFragment::Country(_) => Country::column_names(),
-            RowFragment::Language(_) => Language::column_names(),
-        }
-        .into_iter()
-        .enumerate()
-        .filter(|(index, _)| excluded[*index] == false)
-        .map(|(_, name)| name)
-        .collect()
-    }
-
-    fn to_string_vec(&self, excluded: Vec<bool>) -> Vec<String> {
-        match self {
-            RowFragment::City(data) => excluded
-                .into_iter()
-                .enumerate()
-                .filter(|(_, val)| *val == false)
-                .map(|(index, _)| match index {
-                    0 => data.CityID.to_string(),
-                    1 => data.CityName.clone(),
-                    2 => data.CountryCode.clone(),
-                    3 => data.CityPop.to_string(),
-                    _ => unreachable!(),
-                })
-                .collect(),
-            RowFragment::Country(data) => excluded
-                .into_iter()
-                .enumerate()
-                .filter(|(_, val)| *val == false)
-                .map(|(index, _)| match index {
-                    0 => data.CountryCode.clone(),
-                    1 => data.CountryName.clone(),
-                    2 => data.Continent.clone(),
-                    3 => data.CountryPop.to_string(),
-                    4 => {
-                        if data.Capital.is_some() {
-                            data.Capital.unwrap().to_string()
-                        } else {
-                            String::new()
-                        }
-                    }
-                    _ => unreachable!(),
-                })
-                .collect(),
-            RowFragment::Language(data) => excluded
-                .into_iter()
-                .enumerate()
-                .filter(|(_, val)| *val == false)
-                .map(|(index, _)| match index {
-                    0 => data.CountryCode.clone(),
-                    1 => data.Language.clone(),
-                    _ => unreachable!(),
-                })
-                .collect(),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Row {
-    pub fragments: Vec<RowFragment>,
-}
-
-#[derive(Clone, Debug)]
-pub enum ExcludedColumns {
-    City([bool; 4]),
-    Country([bool; 5]),
-    Language([bool; 2]),
-}
-
-#[allow(dead_code)]
-impl ExcludedColumns {
-    pub fn get_num_included_columns(&self) -> usize {
-        match self {
-            ExcludedColumns::City(excluded) => excluded
-                .into_iter()
-                .filter(|is_excluded| **is_excluded == false)
-                .count(),
-            ExcludedColumns::Country(excluded) => excluded
-                .into_iter()
-                .filter(|is_excluded| **is_excluded == false)
-                .count(),
-            ExcludedColumns::Language(excluded) => excluded
-                .into_iter()
-                .filter(|is_excluded| **is_excluded == false)
-                .count(),
-        }
-    }
-}
-
-impl Into<Vec<bool>> for ExcludedColumns {
-    fn into(self) -> Vec<bool> {
-        match self {
-            ExcludedColumns::City(array) => array.into(),
-            ExcludedColumns::Country(array) => array.into(),
-            ExcludedColumns::Language(array) => array.into(),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Data {
-    pub rows: Vec<Row>,
-    pub excluded_columns: Vec<ExcludedColumns>,
-}
-
-impl Display for Data {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let column_headers: String = self.rows[0]
-            .fragments
-            .iter()
-            .enumerate()
-            .map(|(index, fragment)| fragment.headers(self.excluded_columns[index].clone().into()))
-            .flatten()
-            .collect::<Vec<&str>>()
-            .join(",");
-
-        f.write_fmt(format_args!("{}\n", column_headers))?;
-
-        for row in &self.rows {
-            let row_vals: String = row
-                .fragments
-                .iter()
-                .enumerate()
-                .map(|(index, fragment)| {
-                    fragment.to_string_vec(self.excluded_columns[index].clone().into())
-                })
-                .flatten()
-                .collect::<Vec<String>>()
-                .join(",");
-
-            f.write_fmt(format_args!("{}\n", row_vals))?;
-        }
-
-        Ok(())
-    }
 }

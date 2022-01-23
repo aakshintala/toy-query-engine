@@ -1,9 +1,8 @@
 use std::fmt::Display;
 
 use crate::commands::Dataset;
-use crate::data::{
-    load_cities, load_countries, load_languages, Data, ExcludedColumns, Row, RowFragment,
-};
+use crate::data::{load_cities, load_countries, load_languages, City, Country, Language};
+use crate::table::{Row, Table};
 
 /// Operations supported by this tool.
 /// Each operator returns a set of rows.
@@ -38,6 +37,7 @@ pub enum Operator {
     },
 }
 
+#[allow(dead_code)]
 pub enum OperatorError {
     SelectInvalidColumn { column_name: String },
 }
@@ -53,68 +53,47 @@ impl Display for OperatorError {
     }
 }
 
-pub fn process_operator(operator: Operator) -> Result<Data, OperatorError> {
+pub fn process_operator(operator: Operator) -> Result<Table, OperatorError> {
     match operator {
         Operator::From(dataset) => match dataset {
             Dataset::City => {
                 let cities = load_cities().expect("Couldn't load city.csv");
-                Ok(Data {
+                Ok(Table {
+                    header: City::column_names().iter().map(|s| s.to_string()).collect(),
                     rows: cities
                         .into_iter()
-                        .map(|city| Row {
-                            fragments: vec![RowFragment::City(city)],
-                        })
+                        .map(|city| -> Row { city.into() })
                         .collect(),
-                    excluded_columns: vec![ExcludedColumns::City([false; 4])],
                 })
             }
             Dataset::Country => {
                 let countries = load_countries().expect("Couldn't load city.csv");
-                Ok(Data {
+                Ok(Table {
+                    header: Country::column_names()
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
                     rows: countries
                         .into_iter()
-                        .map(|country| Row {
-                            fragments: vec![RowFragment::Country(country)],
-                        })
+                        .map(|country| -> Row { country.into() })
                         .collect(),
-                    excluded_columns: vec![ExcludedColumns::Country([false; 5])],
                 })
             }
             Dataset::Language => {
                 let languages = load_languages().expect("Couldn't load language.csv");
-                Ok(Data {
+                Ok(Table {
+                    header: Language::column_names()
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
                     rows: languages
                         .into_iter()
-                        .map(|language| Row {
-                            fragments: vec![RowFragment::Language(language)],
-                        })
+                        .map(|language| -> Row { language.into() })
                         .collect(),
-                    excluded_columns: vec![ExcludedColumns::Language([false; 2])],
                 })
             }
         },
-        Operator::Select { chain, column: _ } => {
-            let data = process_operator(*chain)?;
-            Ok(data)
-            // for (fragment_index, fragment) in data.rows[0].fragments.iter().enumerate() {
-            //     let header =
-            // fragment.headers(data.excluded_columns[fragment_index].clone().into());
-            //     match header.iter().enumerate().find(|(index, s)| **s == &column) {
-            //         Some((col_index, column_name)) => {
-            //             let mut excluded: Vec<bool> =
-            // data.excluded_columns[fragment_index].into();             let excluded:
-            // Vec<bool> = excluded                 .iter()
-            //                 .enumerate()
-            //                 .map(|(index, val)| if index == col_index { false } else { true })
-            //                 .collect();
-            //             Ok(data)
-            //         }
-            //         None => Err(OperatorError::SelectInvalidColumn {
-            //             column_name: column.clone(),
-            //         }),
-            //     }
-            // }
-        }
+        Operator::Select { chain, column: _ } => process_operator(*chain),
         Operator::Take { chain: _, count: _ } => todo!(),
         Operator::OrderBy {
             chain: _,
