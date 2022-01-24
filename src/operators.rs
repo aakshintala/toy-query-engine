@@ -232,6 +232,64 @@ fn process_countby(chain: Box<Operator>, column: String) -> Result<Table, Operat
     })
 }
 
+fn process_join(
+    chain: Box<Operator>,
+    right: Dataset,
+    column: String,
+) -> Result<Table, OperatorError> {
+    let table = process_operator(*chain)?;
+    let right_table = process_from(right)?;
+    if !(table.header.contains(&column) && right_table.header.contains(&column)) {
+        Err(OperatorError::NoSuchColumn {
+            operator: String::from("JOIN"),
+            column_name: column,
+        })
+    } else {
+        let header = {
+            let mut header = table.header.clone();
+            for name in &right_table.header {
+                if *name != column {
+                    header.push(name.clone());
+                }
+            }
+            header
+        };
+        let numeric_columns = {
+            let mut numeric_columns = table.numeric_columns.clone();
+            for name in &right_table.numeric_columns {
+                if *name != column {
+                    numeric_columns.push(name.clone());
+                }
+            }
+            numeric_columns
+        };
+        let rows: Vec<Row> = {
+            let left_index = table.find_column_index_by_name(&column).unwrap();
+            let right_index = right_table.find_column_index_by_name(&column).unwrap();
+            let mut rows: Vec<Row> = Vec::new();
+            for left_row in &table.rows {
+                for right_row in &right_table.rows {
+                    if left_row.cells[left_index] == right_row.cells[right_index] {
+                        let mut row = left_row.clone();
+                        for (index, cell) in right_row.cells.iter().enumerate() {
+                            if index != right_index {
+                                row.cells.push(cell.clone());
+                            }
+                        }
+                        rows.push(row);
+                    }
+                }
+            }
+            rows
+        };
+        Ok(Table {
+            header,
+            numeric_columns,
+            rows,
+        })
+    }
+}
+
 pub fn process_operator(operator: Operator) -> Result<Table, OperatorError> {
     match operator {
         Operator::From(dataset) => process_from(dataset),
@@ -243,9 +301,9 @@ pub fn process_operator(operator: Operator) -> Result<Table, OperatorError> {
         Operator::OrderBy { chain, column } => process_orderby(chain, column),
         Operator::CountBy { chain, column } => process_countby(chain, column),
         Operator::Join {
-            chain: _,
-            right: _,
-            column: _,
-        } => todo!(),
+            chain,
+            right,
+            column,
+        } => process_join(chain, right, column),
     }
 }

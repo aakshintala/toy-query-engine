@@ -89,7 +89,28 @@ fn process_tokens(tokens: &Vec<&str>) -> Command {
                 }
                 _ => Command::InputError,
             },
-            _ => command,
+            "JOIN" => {
+                if command.is_operator() {
+                    let dataset = match token_iter.next() {
+                        Some(&"language.csv") => Dataset::Language,
+                        Some(&"city.csv") => Dataset::City,
+                        Some(&"country.csv") => Dataset::Country,
+                        _ => return Command::InputError,
+                    };
+                    let column_name = match token_iter.next() {
+                        Some(column_name) => column_name,
+                        None => return Command::InputError,
+                    };
+                    Command::Operator(Operator::Join {
+                        chain: Box::new(command.take_operator().unwrap()),
+                        right: dataset,
+                        column: column_name.to_string(),
+                    })
+                } else {
+                    Command::InputError
+                }
+            }
+            _ => Command::InputError,
         };
     }
     command
