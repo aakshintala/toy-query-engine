@@ -24,6 +24,21 @@ pub enum Command {
     InputError,
 }
 
+impl Command {
+    fn is_operator(&self) -> bool {
+        match self {
+            Command::Operator(_) => true,
+            _ => false,
+        }
+    }
+    fn take_operator(&self) -> Option<Operator> {
+        match self {
+            Command::Operator(operator) => Some(operator.clone()),
+            _ => None,
+        }
+    }
+}
+
 fn process_tokens(tokens: &Vec<&str>) -> Command {
     let mut token_iter = tokens.into_iter();
     let mut command = Command::InputError;
@@ -36,38 +51,43 @@ fn process_tokens(tokens: &Vec<&str>) -> Command {
                 _ => Command::InputError,
             },
             "SELECT" => match token_iter.next() {
-                Some(columns) => {
-                    if let Command::Operator(operator) = command {
-                        Command::Operator(Operator::Select {
-                            chain: Box::new(operator),
-                            column_names: columns
-                                .split(",")
-                                .filter(|s| !s.is_empty())
-                                .map(|s| s.to_string())
-                                .collect::<Vec<String>>(),
-                        })
-                    } else {
-                        Command::InputError
-                    }
-                }
+                Some(columns) if command.is_operator() => Command::Operator(Operator::Select {
+                    chain: Box::new(command.take_operator().unwrap()),
+                    column_names: columns
+                        .split(",")
+                        .filter(|s| !s.is_empty())
+                        .map(|s| s.to_string())
+                        .collect::<Vec<String>>(),
+                }),
                 _ => Command::InputError,
             },
             "TAKE" => match token_iter.next() {
-                Some(count) => {
-                    let count = str::parse::<usize>(count).expect(&format!(
+                Some(count) if command.is_operator() => Command::Operator(Operator::Take {
+                    chain: Box::new(command.take_operator().unwrap()),
+                    count: str::parse::<usize>(count).expect(&format!(
                         "Invalid value passed to TAKE operator: {}. Must be a positive integer.",
                         count
-                    ));
-                    if let Command::Operator(operator) = command {
-                        Command::Operator(Operator::Take {
-                            chain: Box::new(operator),
-                            count,
-                        })
-                    } else {
-                        Command::InputError
-                    }
+                    )),
+                }),
+                _ => Command::InputError,
+            },
+            "ORDERBY" => match token_iter.next() {
+                Some(column_name) if command.is_operator() => {
+                    Command::Operator(Operator::OrderBy {
+                        chain: Box::new(command.take_operator().unwrap()),
+                        column: column_name.to_string(),
+                    })
                 }
-                None => Command::InputError,
+                _ => Command::InputError,
+            },
+            "COUNTBY" => match token_iter.next() {
+                Some(column_name) if command.is_operator() => {
+                    Command::Operator(Operator::CountBy {
+                        chain: Box::new(command.take_operator().unwrap()),
+                        column: column_name.to_string(),
+                    })
+                }
+                _ => Command::InputError,
             },
             _ => command,
         };

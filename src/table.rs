@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum Cell {
     String(String),
     Int64(i64),
@@ -48,6 +48,7 @@ impl Display for Row {
 #[derive(Clone, Debug)]
 pub struct Table {
     pub header: Vec<String>,
+    pub numeric_columns: Vec<String>,
     pub rows: Vec<Row>,
 }
 
@@ -60,5 +61,19 @@ impl Display for Table {
         }
 
         Ok(())
+    }
+}
+
+impl Table {
+    pub fn find_column_index_by_name(&self, name: &str) -> Option<usize> {
+        match self
+            .header
+            .iter()
+            .enumerate()
+            .find(|(_, col_name)| *col_name == name)
+        {
+            Some((index, _)) => Some(index),
+            None => None,
+        }
     }
 }

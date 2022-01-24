@@ -41,7 +41,7 @@ impl Country {
     }
     #[allow(dead_code)]
     pub fn numeric_columns() -> Vec<&'static str> {
-        vec!["CountryPop", "Capital"]
+        vec!["CountryPop"]
     }
 }
 
