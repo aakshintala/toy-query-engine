@@ -36,17 +36,38 @@ fn process_tokens(tokens: &Vec<&str>) -> Command {
                 _ => Command::InputError,
             },
             "SELECT" => match token_iter.next() {
-                Some(column) => {
+                Some(columns) => {
                     if let Command::Operator(operator) = command {
                         Command::Operator(Operator::Select {
                             chain: Box::new(operator),
-                            column: column.to_string(),
+                            column_names: columns
+                                .split(",")
+                                .filter(|s| !s.is_empty())
+                                .map(|s| s.to_string())
+                                .collect::<Vec<String>>(),
                         })
                     } else {
                         Command::InputError
                     }
                 }
                 _ => Command::InputError,
+            },
+            "TAKE" => match token_iter.next() {
+                Some(count) => {
+                    let count = str::parse::<usize>(count).expect(&format!(
+                        "Invalid value passed to TAKE operator: {}. Must be a positive integer.",
+                        count
+                    ));
+                    if let Command::Operator(operator) = command {
+                        Command::Operator(Operator::Take {
+                            chain: Box::new(operator),
+                            count,
+                        })
+                    } else {
+                        Command::InputError
+                    }
+                }
+                None => Command::InputError,
             },
             _ => command,
         };
@@ -67,7 +88,7 @@ pub fn parse_command(input: &str) -> Command {
             "help" => Command::Help,
             "exit" => Command::Exit,
             _ => {
-                let tokens: Vec<&str> = val.split(" ").into_iter().map(|s| s).collect();
+                let tokens: Vec<&str> = val.split_whitespace().collect();
                 if tokens.is_empty() || tokens[0] != "FROM" {
                     Command::InputError
                 } else {

@@ -29,11 +29,21 @@ pub struct Row {
     pub cells: Vec<Cell>,
 }
 
-// impl Display for Row {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         f.write_fmt(format_args!("{}", self.cells.join(",")))
-//     }
-// }
+impl Row {
+    pub fn join(&self) -> String {
+        self.cells
+            .iter()
+            .map(|cell| format!("{}", cell))
+            .collect::<Vec<String>>()
+            .join(",")
+    }
+}
+
+impl Display for Row {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", self.join()))
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Table {
@@ -41,14 +51,14 @@ pub struct Table {
     pub rows: Vec<Row>,
 }
 
-// impl Display for Table {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         f.write_fmt(format_args!("{}\n", self.header.join(",")))?;
+impl Display for Table {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}\n", self.header.join(",")))?;
 
-//         for row in &self.rows {
-//             f.write_fmt(format_args!("{}\n", row.join(",")))?;
-//         }
+        for row in &self.rows {
+            f.write_fmt(format_args!("{}\n", row))?;
+        }
 
-//         Ok(())
-//     }
-// }
+        Ok(())
+    }
+}

@@ -59,7 +59,7 @@ fn main() {
             }
             Command::Help => println!("{}", C_HELP_MESSAGE),
             Command::Operator(operator) => match process_operator(operator) {
-                Ok(out) => println!("{:#?}", out),
+                Ok(out) => println!("{}", out),
                 Err(e) => println!("{}", e),
             },
             Command::InputError => print_error_message(),
