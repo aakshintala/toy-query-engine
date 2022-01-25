@@ -8,7 +8,7 @@ use crate::table::{Cell, Row, Table};
 
 /// Operations supported by this tool.
 /// These are constructed by parsing the user input on the toy-query-engine command line.
-/// See [`crate::command::parse_commands`]
+/// See [`crate::commands::parse_command`]
 /// Each operator returns a [`Table`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
@@ -135,8 +135,8 @@ impl Display for OperatorError {
                 chain,
                 column_name,
             } => f.write_fmt(format_args!(
-                "Could not {} the {} column in the input table for this operator chain: {}",
-                operator, column_name, chain,
+                "Could not find the {} column to {} on the table produced by this operator chain: {}",
+                column_name, operator, chain,
             )),
             OperatorError::OrderByColumnNotNumeric { column_name } => f.write_fmt(format_args!(
                 "You attempted to ORDERBY the {} column whose type is not numeric.",
@@ -247,6 +247,18 @@ fn test_process_from_language() {
     assert_eq!(result.rows[0].cells.len(), 2);
 }
 
+/// Helper function to find the index that corresponds to the first occurrence of 'name' in `table`.
+///
+/// # Arguments:
+/// 'table' : The table to find the column in.
+/// 'name' : The name of the column whose index is to be returned.
+/// 'chain' : The chain on operators that produced this table (used to construct the error message
+/// if the column doesn't exist in the table).
+/// 'current_operator': The operator calling this function.
+///
+/// # Returns:
+/// Ok([`usize`]) for the index of the first occurrence of `name` in the `table`.
+/// Err([`OperatorError::NoSuchColumn`]) if `name` is not found in the `header` field.
 fn find_column_index(
     table: &Table,
     name: &str,
@@ -297,6 +309,21 @@ fn test_find_column_index_does_not_exist() {
             "H3".to_string(),
             "H4".to_string(),
         ],
+        numeric_columns: vec![],
+        rows: vec![],
+    };
+    let operator = Box::new(Operator::From(Dataset::Language));
+    assert!(find_column_index(&table, "H", &operator, "TEST").is_err());
+    assert!(find_column_index(&table, "H12", &operator, "TEST").is_err());
+    assert!(find_column_index(&table, "H31", &operator, "TEST").is_err());
+    assert!(find_column_index(&table, "H42", &operator, "TEST").is_err());
+}
+
+/// Test find_column_index_by_name for names that do not exist in the table.
+#[test]
+fn test_find_column_index_empty_table() {
+    let table = Table {
+        header: vec![],
         numeric_columns: vec![],
         rows: vec![],
     };
@@ -373,6 +400,17 @@ fn test_process_select_single() {
 }
 
 #[test]
+fn test_process_select_single_non_existant_col() {
+    let result = process_select(
+        &Box::new(Operator::From(Dataset::Language)),
+        &vec!["Capital".to_string()],
+    );
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(err.to_string(), "Could not find the Capital column to Select on the table produced by this operator chain: FROM language.csv".to_string())
+}
+
+#[test]
 fn test_process_select_multiple() {
     let result = process_select(
         &Box::new(Operator::From(Dataset::City)),
@@ -433,6 +471,26 @@ fn test_process_take() {
 }
 
 #[test]
+fn test_process_take_from_empty_table() {
+    let result = process_take(
+        &Box::new(Operator::Take {
+            chain: Box::new(Operator::From(Dataset::Language)),
+            count: 0,
+        }),
+        5,
+    );
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 0);
+    assert_eq!(result.header.len(), 2);
+    assert_eq!(
+        result.header,
+        vec!["CountryCode".to_string(), "Language".to_string()]
+    );
+    assert_eq!(result.numeric_columns.len(), 0);
+}
+
+#[test]
 fn test_process_take_more_than_rows_in_data() {
     let result = process_take(&Box::new(Operator::From(Dataset::Language)), 10000);
     assert!(result.is_ok());
@@ -444,6 +502,28 @@ fn test_process_take_more_than_rows_in_data() {
         vec!["CountryCode".to_string(), "Language".to_string()]
     );
     assert_eq!(result.numeric_columns.len(), 0);
+}
+
+/// Helper function to sort the input 'rows' on the `col_index` column.
+/// # Usage Note: The caller must guarantee that the col_index exists in the table and is numeric.
+fn sort_table(rows: &mut Vec<Row>, col_index: usize) {
+    rows.sort_by(|a: &Row, b: &Row| {
+        let b_val = match b.cells[col_index] {
+            Cell::Int64(val) => val,
+            // This is unreachable because we would have returned
+            // OperatorError::OrderByColumnNotNumeric in the check above if this column was not
+            // numeric.
+            _ => unreachable!(),
+        };
+        let a_val = match a.cells[col_index] {
+            Cell::Int64(val) => val,
+            // This is unreachable because we would have returned
+            // OperatorError::OrderByColumnNotNumeric in the check above if this column was not
+            // numeric.
+            _ => unreachable!(),
+        };
+        b_val.cmp(&a_val)
+    });
 }
 
 /// Handles the [`Operator::OrderBy`] operator by processing the [`Operator`] chain and reverse
@@ -476,24 +556,45 @@ fn process_orderby(chain: &Box<Operator>, column: String) -> Result<Table, Opera
     // This can throw the [`OperatorError::NoSuchColumn`] error.
     let col_index = find_column_index(&table, &column, chain, "ORDERBY")?;
 
-    table.rows.sort_by(|a: &Row, b: &Row| {
-        let b_val = match b.cells[col_index] {
-            Cell::Int64(val) => val,
-            // This is unreachable because we would have returned
-            // OperatorError::OrderByColumnNotNumeric in the check above if this column was not
-            // numeric.
-            _ => unreachable!(),
-        };
-        let a_val = match a.cells[col_index] {
-            Cell::Int64(val) => val,
-            // This is unreachable because we would have returned
-            // OperatorError::OrderByColumnNotNumeric in the check above if this column was not
-            // numeric.
-            _ => unreachable!(),
-        };
-        b_val.cmp(&a_val)
-    });
+    // Do the actual sort
+    sort_table(&mut table.rows, col_index);
+
     Ok(table)
+}
+
+#[test]
+fn test_process_orderby_numeric() {
+    let result = process_orderby(
+        &Box::new(Operator::Take {
+            chain: Box::new(Operator::From(Dataset::City)),
+            count: 10,
+        }),
+        "CityPop".to_string(),
+    );
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 10);
+    assert_eq!(result.header.len(), 4);
+    assert!(result.rows[0].cells[3] >= result.rows[1].cells[3]);
+    assert!(result.rows[1].cells[3] >= result.rows[2].cells[3]);
+    assert!(result.rows[2].cells[3] >= result.rows[3].cells[3]);
+}
+
+#[test]
+fn test_process_orderby_non_numeric() {
+    let result = process_orderby(
+        &Box::new(Operator::Take {
+            chain: Box::new(Operator::From(Dataset::City)),
+            count: 10,
+        }),
+        "CityName".to_string(),
+    );
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "You attempted to ORDERBY the CityName column whose type is not numeric.".to_string()
+    );
 }
 
 /// Handles the [`Operator::CountBy`] operator by processing the [`Operator`] chain and produces a
@@ -518,7 +619,7 @@ fn process_countby(chain: &Box<Operator>, column: String) -> Result<Table, Opera
     // This can throw the [`OperatorError::NoSuchColumn`] error.
     let col_index = find_column_index(&table, &column, chain, "COUNTBY")?;
 
-    let histogram: Vec<Row> = table
+    let mut histogram: Vec<Row> = table
         .rows
         .into_iter()
         // Count the number of times each `value` in the selected column occurs in the input table
@@ -534,6 +635,9 @@ fn process_countby(chain: &Box<Operator>, column: String) -> Result<Table, Opera
         })
         .collect();
 
+    // sort the histogram on the 'count' column for stable ordering in the output.
+    sort_table(&mut histogram, col_index);
+
     Ok(Table {
         header: vec![column.clone(), String::from("count")],
         numeric_columns: if table.numeric_columns.contains(&column) {
@@ -543,6 +647,58 @@ fn process_countby(chain: &Box<Operator>, column: String) -> Result<Table, Opera
         },
         rows: histogram,
     })
+}
+
+#[test]
+fn test_process_countby() {
+    let result = process_countby(
+        &Box::new(Operator::Take {
+            chain: Box::new(Operator::From(Dataset::Language)),
+            count: 100,
+        }),
+        "Language".to_string(),
+    );
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 70);
+    assert_eq!(result.header.len(), 2);
+    assert_eq!(
+        result.rows[0].cells,
+        vec![Cell::String("English".to_string()), Cell::Int64(7)],
+    );
+    assert_eq!(
+        result.rows[1].cells,
+        vec![Cell::String("Arabic".to_string()), Cell::Int64(4)],
+    );
+}
+
+#[test]
+fn test_process_countby_empty() {
+    let result = process_countby(
+        &Box::new(Operator::Take {
+            chain: Box::new(Operator::From(Dataset::Language)),
+            count: 0,
+        }),
+        "Language".to_string(),
+    );
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 0);
+    assert_eq!(result.header.len(), 2);
+}
+
+#[test]
+fn test_process_countby_no_such_column() {
+    let result = process_countby(
+        &Box::new(Operator::Take {
+            chain: Box::new(Operator::From(Dataset::Language)),
+            count: 100,
+        }),
+        "CityPop".to_string(),
+    );
+    assert!(result.is_err());
+    let result = result.unwrap_err();
+    assert_eq!(result.to_string(), "Could not find the CityPop column to COUNTBY on the table produced by this operator chain: FROM language.csv TAKE 100".to_string());
 }
 
 /// Handles the [`Operator::Join`] operator by processing the [`Operator`] chain to produce the
@@ -631,6 +787,93 @@ fn process_join(
         numeric_columns,
         rows,
     })
+}
+
+#[test]
+fn test_process_join_simple() {
+    let result = process_join(
+        &Box::new(Operator::From(Dataset::City)),
+        &Dataset::Country,
+        "CountryCode".to_string(),
+    );
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 4079);
+    assert_eq!(
+        result.rows[4066].cells,
+        vec![
+            Cell::Int64(4067),
+            Cell::String("Charlotte_Amalie".to_string()),
+            Cell::String("VIR".to_string()),
+            Cell::Int64(13000),
+            Cell::String("Virgin_Islands_U.S.".to_string()),
+            Cell::String("North_America".to_string()),
+            Cell::Int64(93000),
+            Cell::OptInt64(Some(4067))
+        ]
+    )
+}
+
+#[test]
+fn test_process_join_complex() {
+    let result = process_join(
+        &Box::new(Operator::Join {
+            chain: Box::new(Operator::From(Dataset::City)),
+            right: Dataset::Country,
+            column: "CountryCode".to_string(),
+        }),
+        &Dataset::Language,
+        "CountryCode".to_string(),
+    );
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 30670);
+    assert_eq!(
+        result.rows[30668].cells,
+        vec![
+            Cell::Int64(4079),
+            Cell::String("Rafah".to_string()),
+            Cell::String("PSE".to_string()),
+            Cell::Int64(92020),
+            Cell::String("Palestine".to_string()),
+            Cell::String("Asia".to_string()),
+            Cell::Int64(3101000),
+            Cell::OptInt64(Some(4074)),
+            Cell::String("Arabic".to_string()),
+        ]
+    )
+}
+
+#[test]
+fn test_process_join_no_such_column_left() {
+    let result = process_join(
+        &Box::new(Operator::Join {
+            chain: Box::new(Operator::From(Dataset::City)),
+            right: Dataset::Country,
+            column: "Language".to_string(),
+        }),
+        &Dataset::Language,
+        "CountryCode".to_string(),
+    );
+    assert!(result.is_err());
+    let result = result.unwrap_err();
+    assert_eq!(result.to_string(), "Could not find the Language column to JOIN on the table produced by this operator chain: FROM city.csv".to_string());
+}
+
+#[test]
+fn test_process_join_no_such_column_right() {
+    let result = process_join(
+        &Box::new(Operator::Join {
+            chain: Box::new(Operator::From(Dataset::City)),
+            right: Dataset::Country,
+            column: "CountryCode".to_string(),
+        }),
+        &Dataset::Language,
+        "Capital".to_string(),
+    );
+    assert!(result.is_err());
+    let result = result.unwrap_err();
+    assert_eq!(result.to_string(), "Could not find the Capital column to JOIN on the table produced by this operator chain: FROM city.csv JOIN country.csv CountryCode".to_string());
 }
 
 /// Handles the input [`Operator`] by delegating to the functions above.

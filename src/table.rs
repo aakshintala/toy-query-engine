@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 /// Type used to hold data in the Table. All data must be wrapped in one of these variants.
 /// Cells correspond to the columns of a row.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd)]
 pub enum Cell {
     /// The value in the cell is a String.
     String(String),
