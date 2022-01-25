@@ -40,6 +40,14 @@ const C_HELP_MESSAGE: &str =
           <column-name> : [CountryCode,Language]\n
           <numeric-column-name> : []\n";
 
+/// Main driver logic for parsing the user input and running the query.
+///
+/// # Arguments
+/// 'input': The text entered by the user.
+///
+/// # Returns
+/// `true` - Indicates the user entered the 'exit' command and the process should exit.
+/// `false` - Some other command was entered and the process should not exit.
 fn process_input(input: &str) -> bool {
     let mut should_exit = false;
     match parse_command(input) {
@@ -87,8 +95,6 @@ fn main() {
     println!("Toy Query Engine v0.1");
     println!("Enter your query, or 'help' for more information or 'exit' to exit.");
     loop {
-        // print!(">");
-        // std::io::stdout().flush().expect("Error writing to stdout.");
         let mut input = String::new();
         if let Err(e) = std::io::stdin().read_line(&mut input) {
             print_error_message(&e.to_string());
