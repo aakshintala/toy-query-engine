@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Display;
+use std::vec;
 
 use crate::data::{load_cities, load_countries, load_languages, City, Country, Dataset, Language};
 use crate::table::{Cell, Row, Table};
@@ -219,6 +220,33 @@ fn process_from(dataset: &Dataset) -> Result<Table, OperatorError> {
     load_dataset(dataset, "FROM")
 }
 
+#[test]
+fn test_process_from_city() {
+    let result = process_from(&Dataset::City);
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 4079);
+    assert_eq!(result.rows[0].cells.len(), 4);
+}
+
+#[test]
+fn test_process_from_country() {
+    let result = process_from(&Dataset::Country);
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 239);
+    assert_eq!(result.rows[0].cells.len(), 5);
+}
+
+#[test]
+fn test_process_from_language() {
+    let result = process_from(&Dataset::Language);
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 984);
+    assert_eq!(result.rows[0].cells.len(), 2);
+}
+
 fn find_column_index(
     table: &Table,
     name: &str,
@@ -236,6 +264,47 @@ fn find_column_index(
             })
         }
     }
+}
+
+/// Test find_column_index for names that do exist in the table.
+#[test]
+fn test_find_column_index_exists() {
+    let table = Table {
+        header: vec![
+            "H1".to_string(),
+            "H2".to_string(),
+            "H3".to_string(),
+            "H4".to_string(),
+        ],
+        numeric_columns: vec![],
+        rows: vec![],
+    };
+
+    let operator = Box::new(Operator::From(Dataset::Language));
+    assert!(find_column_index(&table, "H1", &operator, "TEST").is_ok());
+    assert!(find_column_index(&table, "H2", &operator, "TEST").is_ok());
+    assert!(find_column_index(&table, "H3", &operator, "TEST").is_ok());
+    assert!(find_column_index(&table, "H4", &operator, "TEST").is_ok());
+}
+
+/// Test find_column_index_by_name for names that do not exist in the table.
+#[test]
+fn test_find_column_index_does_not_exist() {
+    let table = Table {
+        header: vec![
+            "H1".to_string(),
+            "H2".to_string(),
+            "H3".to_string(),
+            "H4".to_string(),
+        ],
+        numeric_columns: vec![],
+        rows: vec![],
+    };
+    let operator = Box::new(Operator::From(Dataset::Language));
+    assert!(find_column_index(&table, "H", &operator, "TEST").is_err());
+    assert!(find_column_index(&table, "H12", &operator, "TEST").is_err());
+    assert!(find_column_index(&table, "H31", &operator, "TEST").is_err());
+    assert!(find_column_index(&table, "H42", &operator, "TEST").is_err());
 }
 
 /// Handles the [`Operator::Select`] operator by processing the [`Operator`] chain and selecting the
@@ -289,6 +358,37 @@ fn process_select(
     })
 }
 
+#[test]
+fn test_process_select_single() {
+    let result = process_select(
+        &Box::new(Operator::From(Dataset::Language)),
+        &vec!["Language".to_string()],
+    );
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 984);
+    assert_eq!(result.header.len(), 1);
+    assert_eq!(result.header[0], "Language".to_string());
+    assert_eq!(result.rows[0].cells.len(), 1);
+}
+
+#[test]
+fn test_process_select_multiple() {
+    let result = process_select(
+        &Box::new(Operator::From(Dataset::City)),
+        &vec!["CityID".to_string(), "CityName".to_string()],
+    );
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 4079);
+    assert_eq!(result.header.len(), 2);
+    assert_eq!(
+        result.header,
+        vec!["CityID".to_string(), "CityName".to_string()]
+    );
+    assert_eq!(result.rows[0].cells.len(), 2);
+}
+
 /// Handles the [`Operator::Take`] operator by processing the [`Operator`] chain and selecting the
 /// first `count` column(s) from the resulting [`Table`].
 ///
@@ -316,6 +416,34 @@ fn process_take(chain: &Box<Operator>, count: usize) -> Result<Table, OperatorEr
             .collect(),
         numeric_columns: table.numeric_columns,
     })
+}
+
+#[test]
+fn test_process_take() {
+    let result = process_take(&Box::new(Operator::From(Dataset::Language)), 5);
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 5);
+    assert_eq!(result.header.len(), 2);
+    assert_eq!(
+        result.header,
+        vec!["CountryCode".to_string(), "Language".to_string()]
+    );
+    assert_eq!(result.numeric_columns.len(), 0);
+}
+
+#[test]
+fn test_process_take_more_than_rows_in_data() {
+    let result = process_take(&Box::new(Operator::From(Dataset::Language)), 10000);
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.rows.len(), 984);
+    assert_eq!(result.header.len(), 2);
+    assert_eq!(
+        result.header,
+        vec!["CountryCode".to_string(), "Language".to_string()]
+    );
+    assert_eq!(result.numeric_columns.len(), 0);
 }
 
 /// Handles the [`Operator::OrderBy`] operator by processing the [`Operator`] chain and reverse
