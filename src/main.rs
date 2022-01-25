@@ -15,7 +15,8 @@ fn print_error_message(error_message: &str) {
 const C_HELP_MESSAGE: &str =
     "Available Commands: \n
       FROM <dataset> - Loads the `dataset`. \n
-          Maybe chained with other commands. If no other command is specified, will print the `dataset`. \n
+          Maybe chained with other commands. Must always be the first command in a chain.\n
+          If no other command is specified, will print the `dataset`. \n
       SELECT <column-name> - used to select particular columns from the specified dataset. \n
           See the Datasets section below for a list of column-names for each dataset. \n
       TAKE <number> - Specifies the number of rows to print from the dataset. \n
