@@ -55,3 +55,4 @@ A small command-line program for querying CSV files.
             <numeric-column-name> : []
         ```
     1. `exit` to exit.
+1. `cargo doc --open` to browse the documentation in a web browser.
