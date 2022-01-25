@@ -1,5 +1,3 @@
-use std::io::Write;
-
 mod commands;
 mod data;
 mod operators;
@@ -9,8 +7,8 @@ use commands::*;
 use operators::*;
 
 /// Prints an error message about the input being malformed to stdout.
-fn print_error_message() {
-    println!("Malformed input. Please check your input and try again.");
+fn print_error_message(error_message: &str) {
+    println!("Malformed input. {}", error_message);
 }
 
 /// The help message to print to stdout for the `help` command.
@@ -41,28 +39,63 @@ const C_HELP_MESSAGE: &str =
           <column-name> : [CountryCode,Language]\n
           <numeric-column-name> : []\n";
 
+fn process_input(input: &str) -> bool {
+    let mut should_exit = false;
+    match parse_command(input) {
+        Command::Exit => {
+            println!("Goodbye!");
+            should_exit = true;
+        }
+        Command::Help => println!("{}", C_HELP_MESSAGE),
+        Command::Operator(operator) => match process_operator(&operator) {
+            Ok(out) => println!("{}", out),
+            Err(e) => println!("{}", e),
+        },
+        Command::InputError(error) => print_error_message(&error),
+        Command::NoInput => (),
+    }
+    should_exit
+}
+
+#[test]
+fn test_process_input_no_input() {
+    assert_eq!(process_input("\n"), false);
+}
+
+#[test]
+fn test_process_input_exit() {
+    assert_eq!(process_input("exit\n"), true);
+}
+
+#[test]
+fn test_process_input_help() {
+    assert_eq!(process_input("help\n"), false);
+}
+
+#[test]
+fn test_process_input_some_command() {
+    assert_eq!(process_input("FROM language.csv\n"), false);
+}
+
+#[test]
+fn test_process_input_malformed_command() {
+    assert_eq!(process_input("FRM language.csv\n"), false);
+}
+
 fn main() {
     println!("Toy Query Engine v0.1");
     println!("Enter your query, or 'help' for more information or 'exit' to exit.");
     loop {
-        print!(">");
-        std::io::stdout().flush().expect("Error writing to stdout.");
+        // print!(">");
+        // std::io::stdout().flush().expect("Error writing to stdout.");
         let mut input = String::new();
-        if let Err(_) = std::io::stdin().read_line(&mut input) {
-            print_error_message();
+        if let Err(e) = std::io::stdin().read_line(&mut input) {
+            print_error_message(&e.to_string());
             continue;
         }
-        match parse_command(&input) {
-            Command::Exit => {
-                println!("Goodbye!");
-                std::process::exit(0);
-            }
-            Command::Help => println!("{}", C_HELP_MESSAGE),
-            Command::Operator(operator) => match process_operator(operator) {
-                Ok(out) => println!("{}", out),
-                Err(e) => println!("{}", e),
-            },
-            Command::InputError => print_error_message(),
+        let should_exit = process_input(&input);
+        if should_exit {
+            std::process::exit(0)
         }
     }
 }

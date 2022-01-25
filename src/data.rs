@@ -12,7 +12,7 @@ use crate::table::{Cell, Row};
 /// Example record:
 /// CountryCode, CountryName, Continent,        CountryPop, Capital
 /// ABW,         Aruba,       North_America,    103000,     129
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 // This is necessary as the header in the dataset (`country.csv`) is in CamelCase. `serde` and `csv`
 // rely on these names being the same as those in the header row in the dataset.
 #[allow(non_snake_case)]
@@ -30,18 +30,20 @@ pub struct Country {
 }
 
 impl Country {
-    pub fn column_names() -> Vec<&'static str> {
+    /// Returns the names of the columns in the City dataset.
+    pub fn column_names() -> Vec<String> {
         vec![
-            "CountryCode",
-            "CountryName",
-            "Continent",
-            "CountryPop",
-            "Capital",
+            "CountryCode".to_string(),
+            "CountryName".to_string(),
+            "Continent".to_string(),
+            "CountryPop".to_string(),
+            "Capital".to_string(),
         ]
     }
-    #[allow(dead_code)]
-    pub fn numeric_columns() -> Vec<&'static str> {
-        vec!["CountryPop"]
+
+    /// Returns the names of only those columns whose values are numeric.
+    pub fn numeric_columns() -> Vec<String> {
+        vec!["CountryPop".to_string()]
     }
 }
 
@@ -59,6 +61,7 @@ impl Display for Country {
     }
 }
 
+/// Trait to make it easy to convert the Country struct in a [`Row`].
 impl Into<Row> for Country {
     fn into(self) -> Row {
         Row {
@@ -88,6 +91,25 @@ pub fn load_countries() -> Result<Vec<Country>, Box<dyn Error>> {
     Ok(countries)
 }
 
+#[test]
+fn test_load_countries() {
+    let countries = load_countries();
+    assert!(countries.is_ok());
+    let countries = countries.unwrap();
+    assert!(countries.len() > 0);
+    let first = countries.first().unwrap().to_owned();
+    assert_eq!(
+        first,
+        Country {
+            CountryCode: "ABW".to_string(),
+            CountryName: "Aruba".to_string(),
+            Continent: "North_America".to_string(),
+            CountryPop: 103000,
+            Capital: Some(129),
+        }
+    );
+}
+
 /// In-memory representation of each record in the `city.csv` dataset.
 /// This is represented as a struct so we can use the [`serde`] and [`csv`] crates to generate
 /// the deserialization code.
@@ -95,7 +117,7 @@ pub fn load_countries() -> Result<Vec<Country>, Box<dyn Error>> {
 /// Example record:
 /// CityID, CityName,   CountryCode,    CityPop
 /// 1,      Kabul,      AFG,            1780000
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 // This is necessary as the header row in the dataset (`city.csv`) is in CamelCase. `serde` and
 // `csv` rely on these names being the same as those in the header row in the dataset.
 #[allow(non_snake_case)]
@@ -119,6 +141,7 @@ impl Display for City {
     }
 }
 
+/// Trait to make it easy to convert the [`City`] struct in a [`Row`].
 impl Into<Row> for City {
     fn into(self) -> Row {
         Row {
@@ -133,13 +156,19 @@ impl Into<Row> for City {
 }
 
 impl City {
-    pub fn column_names() -> Vec<&'static str> {
-        vec!["CityID", "CityName", "CountryCode", "CityPop"]
+    /// Returns the names of the columns in the City dataset.
+    pub fn column_names() -> Vec<String> {
+        vec![
+            "CityID".to_string(),
+            "CityName".to_string(),
+            "CountryCode".to_string(),
+            "CityPop".to_string(),
+        ]
     }
 
-    #[allow(dead_code)]
-    pub fn numeric_columns() -> Vec<&'static str> {
-        vec!["CityID", "CityPop"]
+    /// Returns the names of only those columns whose values are numeric.
+    pub fn numeric_columns() -> Vec<String> {
+        vec!["CityID".to_string(), "CityPop".to_string()]
     }
 }
 
@@ -158,6 +187,24 @@ pub fn load_cities() -> Result<Vec<City>, Box<dyn Error>> {
     Ok(cities)
 }
 
+#[test]
+fn test_load_cities() {
+    let cities = load_cities();
+    assert!(cities.is_ok());
+    let cities = cities.unwrap();
+    assert!(cities.len() > 0);
+    let first = cities.first().unwrap().to_owned();
+    assert_eq!(
+        first,
+        City {
+            CityID: 1,
+            CityName: "Kabul".to_string(),
+            CountryCode: "AFG".to_string(),
+            CityPop: 1780000,
+        }
+    );
+}
+
 /// In-memory representation of each record in the `city.csv` dataset.
 /// This is represented as a struct so we can use the [`serde`] and [`csv`] crates to generate
 /// the deserialization code.
@@ -165,7 +212,7 @@ pub fn load_cities() -> Result<Vec<City>, Box<dyn Error>> {
 /// Example record:
 /// CountryCode,    Language
 /// ABW,            Dutch
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 // This is necessary as the header row in the dataset (`city.csv`) is in CamelCase. `serde` and
 // `csv` rely on these names being the same as those in the header row in the dataset.
 #[allow(non_snake_case)]
@@ -183,16 +230,18 @@ impl Display for Language {
 }
 
 impl Language {
-    pub fn column_names() -> Vec<&'static str> {
-        vec!["CountryCode", "Language"]
+    /// Returns the names of the columns in the Language dataset.
+    pub fn column_names() -> Vec<String> {
+        vec!["CountryCode".to_string(), "Language".to_string()]
     }
 
-    #[allow(dead_code)]
-    pub fn numeric_columns() -> Vec<&'static str> {
+    /// Returns the names of only those columns whose values are numeric.
+    pub fn numeric_columns() -> Vec<String> {
         vec![]
     }
 }
 
+/// Trait to make it easy to convert the [`Language`] struct in a [`Row`].
 impl Into<Row> for Language {
     fn into(self) -> Row {
         Row {
@@ -214,4 +263,41 @@ pub fn load_languages() -> Result<Vec<Language>, Box<dyn Error>> {
         languages.push(language);
     }
     Ok(languages)
+}
+
+#[test]
+fn test_load_languages() {
+    let languages = load_languages();
+    assert!(languages.is_ok());
+    let languages = languages.unwrap();
+    assert!(languages.len() > 0);
+    let first = languages.first().unwrap().to_owned();
+    assert_eq!(
+        first,
+        Language {
+            CountryCode: "ABW".to_string(),
+            Language: "Dutch".to_string(),
+        }
+    );
+}
+
+/// The datasets known to the toy-query-engine.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Dataset {
+    /// city.csv
+    City,
+    /// country.csv
+    Country,
+    /// language.csv
+    Language,
+}
+
+impl Display for Dataset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Dataset::City => f.write_str("city.csv"),
+            Dataset::Country => f.write_str("country.csv"),
+            Dataset::Language => f.write_str("language.csv"),
+        }
+    }
 }
